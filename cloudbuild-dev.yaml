@@ -1,33 +1,35 @@
-steps:
-- name: 'gcr.io/cloud-builders/docker'
-  entrypoint: 'bash'
-  args: [
-         '-c',
-         'docker pull gcr.io/$PROJECT_ID/${_URL}:latest || exit 0'
-  ]
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['build',
-          '--build-arg',
-         'version_code=${BRANCH_NAME} (${SHORT_SHA})',
-         '-t',
-         'gcr.io/$PROJECT_ID/${_URL}:${BRANCH_NAME}.${SHORT_SHA}',
-         '-t',
-         'gcr.io/$PROJECT_ID/${_URL}:latest',
-         '--cache-from',
-         'gcr.io/$PROJECT_ID/${_URL}:latest',
-         '.']
-- name: 'gcr.io/cloud-builders/kubectl'
-  args: [
-   'set', 
-   'image', 
-   'deployment', 
-   '${_APP_NAME}', 
-   '${_IMAGE_NAME}=gcr.io/$PROJECT_ID/${_URL}:${BRANCH_NAME}.${SHORT_SHA}'
-  ]
-  env:
-  - 'CLOUDSDK_COMPUTE_ZONE=${_COMPUTE_ZONE}'
-  - 'CLOUDSDK_CONTAINER_CLUSTER=${_CLUSTER_NAME}'
-images: [
-    'gcr.io/$PROJECT_ID/${_URL}:${BRANCH_NAME}.${SHORT_SHA}',
-    'gcr.io/$PROJECT_ID/${_URL}:latest'
-]
+version: '3'
+
+services:
+  app:
+    entrypoint: [bin/start]
+    image: bigbluebutton/greenlight:v2
+    container_name: greenlight-v2
+    env_file: .env
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:5000:80
+# When using external logging
+#    logging:
+#      driver: $LOG_DRIVER
+#      options:
+#        syslog-address: $LOG_ADDRESS
+#        tag: $LOG_TAG
+    volumes:
+      - ./log:/usr/src/app/log
+# When using sqlite3 as the database
+#      - ./db/production:/usr/src/app/db/production
+# When using postgresql as the database
+    links:
+      - db
+  db:
+    image: postgres:9.5
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:5432:5432
+    volumes:
+      - ./db/production:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=7cbbef6c79c6ac78
